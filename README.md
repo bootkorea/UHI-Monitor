@@ -13,11 +13,11 @@
 ## 기술 스택
 |분야|사용 기술|
 |---|---|
+|Frntend| Java |
+|Backend|  |
+|Databse|  |
 |IDE| Android Studio |
-|| Android SDK |
-|Database|  |
 |API|  |
-|ETC|  |
 
 ## Team
 |성명|역할|
