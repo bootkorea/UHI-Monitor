@@ -77,7 +77,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         setContentView(R.layout.activity_main);
 
         NaverMapSdk.getInstance(this).setClient(
-                new NaverMapSdk.NaverCloudPlatformClient("hfpnvnkly3"));
+                new NaverMapSdk.NaverCloudPlatformClient("9f1fnoqugk"));
 
         locationSource =
                 new FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE);
@@ -117,6 +117,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
 
         //chart
+        chart = (LineChart) findViewById(R.id.LineChart);
         chart = (LineChart) findViewById(R.id.LineChart);
         chart2 = (LineChart) findViewById(R.id.LineChart2);
 
