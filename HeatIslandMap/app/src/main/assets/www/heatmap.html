@@ -1,61 +1,91 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-    <title>간단한 지도 표시하기</title>
-    <script type="text/javascript"
-            src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=izwj94dlgx&submodules=visualization"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>네이버 지도에 GeoJSON 데이터 표시하기</title>
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=izwj94dlgx"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        #map { width: 100%; height: 400px; }
+        .tooltip { position: absolute; z-index: 1000; padding: 5px 10px; background-color: #fff; border: solid 2px #000; font-size: 14px; pointer-events: none; display: none; }
+    </style>
 </head>
-
 <body>
-<div id="map" style="width:100%;height:400px;"></div>
-<div id="heatmap" style="width:100%;height:400px;"></div>
-
+<div id="text">로딩 중</div>
+<div id="map"></div>
 <script>
-        //지도 생성 시에 옵션을 지정할 수 있습니다.
-        var map = new naver.maps.Map('map', {
-            center: new naver.maps.LatLng(37.3595704, 127.105399), //지도의 초기 중심 좌표
-            zoom: 13, //지도의 초기 줌 레벨
-            minZoom: 7, //지도의 최소 줌 레벨
-            zoomControl: true, //줌 컨트롤의 표시 여부
-            zoomControlOptions: { //줌 컨트롤의 옵션
-                position: naver.maps.Position.TOP_RIGHT
-            }
-        });
+var map = new naver.maps.Map(document.getElementById('map'), {
+    zoom: 10,
+    mapTypeId: 'normal',
+    center: new naver.maps.LatLng(37.5642135, 127.0016985)
+});
 
-        var data = [
-            new naver.maps.LatLng(35.42, 128.50),
-            new naver.maps.LatLng(35.42, 128.51),
-            new naver.maps.LatLng(35.42, 128.52),
-            new naver.maps.LatLng(35.42, 128.53),
-            new naver.maps.LatLng(35.42, 128.54),
-            new naver.maps.LatLng(35.42, 128.55),
-            new naver.maps.LatLng(35.42, 128.56),
-            new naver.maps.LatLng(35.42, 128.56),
-            new naver.maps.LatLng(35.57, 128.34),
+var HOME_PATH = window.HOME_PATH || '.';
 
-            new naver.maps.LatLng(36.57, 128.34),
-            new naver.maps.LatLng(37.57, 128.34),
-            new naver.maps.LatLng(32.57, 128.34),
-            // (생략)
-
-            new naver.maps.LatLng(36.30, 125.9),
-            new naver.maps.LatLng(35.80, 128.2),
-            new naver.maps.LatLng(38.70, 127.9)
-        ];
-
-        naver.maps.onJSContentLoaded = function () {
-            heatmap = new naver.maps.visualization.HeatMap({
-                map: map,
-                data: data
-            });
+naver.maps.Event.once(map, 'init', function () {
+    $.ajax({
+        url: 'https://raw.githubusercontent.com/bootkorea/UHI-Monitor/main/HeatIslandMap/app/src/main/assets/hangjeongdong.geojson',
+        dataType: 'json',
+        success: function(response) {
+            $('#text').html('일단 데이터는 불러옴');
+            startDataLayer(response);
+            $('#text').html('데이터 레이어 추가 완료');
+        },
+        error: function(xhr, status, error) {
+            $('#text').html('데이터를 불러오는 데 실패했습니다');
         }
-    </script>
-</body>
+    });
+});
 
+function startDataLayer(geojson) {
+    map.data.addGeoJson(geojson);
+
+    map.data.setStyle(function(feature) {
+        var color = 'red'; // 기본 색상
+
+        // amd_cd 값이 특정 조건을 만족하면 다른 색상으로 변경
+        if (feature.getProperty('adm_cd') == '1101054') {
+            color = '#ffffff';
+        }
+
+        // amd_cd 값이 특정 조건을 만족하면 다른 색상으로 변경
+        if (feature.getProperty('adm_cd') == '1104054') {
+            color = '#000000';
+        }
+
+        return {
+            fillColor: color,
+            strokeColor: color,
+            strokeWeight: 2,
+            icon: null
+        };
+    });
+
+    map.data.addListener('click', function(e) {
+        e.feature.setProperty('isColorful', true);
+    });
+
+    map.data.addListener('dblclick', function(e) {
+        var bounds = e.feature.getBounds();
+
+        if (bounds) {
+            map.panToBounds(bounds);
+        }
+    });
+
+    map.data.addListener('mouseover', function(e) {
+        map.data.overrideStyle(e.feature, {
+            strokeWeight: 8,
+            icon: HOME_PATH +'/img/example/pin_spot.png'
+        });
+    });
+
+    map.data.addListener('mouseout', function(e) {
+        map.data.revertStyle();
+    });
+}
+</script>
+</body>
 </html>
