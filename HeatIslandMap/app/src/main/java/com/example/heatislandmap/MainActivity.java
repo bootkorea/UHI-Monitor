@@ -1,65 +1,90 @@
 package com.example.heatislandmap;
 
-import androidx.annotation.NonNull;
+import static com.example.heatislandmap.GetTemp.sortedTemp;
+import static com.example.heatislandmap.HeatIslandAlg.tempDiff;
+import static com.example.heatislandmap.NameDictionary.GU_DICT;
+
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.res.ResourcesCompat;
-import androidx.core.graphics.ColorUtils;
 
 import android.os.Bundle;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 
 import com.github.mikephil.charting.charts.LineChart;
-import com.naver.maps.geometry.LatLng;
-import com.naver.maps.map.CameraPosition;
-import com.naver.maps.map.LocationTrackingMode;
-import com.naver.maps.map.MapFragment;
-import com.naver.maps.map.NaverMap;
-import com.naver.maps.map.NaverMapSdk;
-import com.naver.maps.map.OnMapReadyCallback;
-import com.naver.maps.map.UiSettings;
-import com.naver.maps.map.overlay.Marker;
-import com.naver.maps.map.overlay.PolygonOverlay;
-import com.naver.maps.map.util.FusedLocationSource;
+import com.google.gson.Gson;
 
 import java.net.URLEncoder;
-import java.util.Arrays;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
-    private static final List<LatLng> COORDS_1 = Arrays.asList( // 이런 식으로 센서좌표를 따와서 구역 지정해주기
-            new LatLng(37.5734571, 126.975335),
-            new LatLng(37.5738912, 126.9825649),
-            new LatLng(37.5678124, 126.9812127),
-            new LatLng(37.5694007, 126.9739434)
-    );
-    protected static final int LOCATION_PERMISSION_REQUEST_CODE = 1000;
-    protected static NaverMap naverMap;
-    protected static Marker marker = new Marker();
+public class MainActivity extends AppCompatActivity {
+    private static final double HEAT_ISLAND_TEMP = -0.5; //임의로 설정한 열섬기준온도, -0.5도를 열섬기준 온도로 잡았음, -0.5도가 넘어가는 지역은 열섬지역으로 간주
+
+    private String jsonDataOfArea; //지역&온도를 담은 HashMap을 json형태로 바꾼 것
+    private String areaName; //검색창에 입력할 지역명
+    private LineChart chart;
+    private double latitude, longitude; //검색한 지역의 위도, 경도
 
     private EditText searchEditText;
-    private Button searchButton;
-    private LineChart chart;
-    private FusedLocationSource locationSource;
+    private Button searchButton, searchButton2;
+    private WebView myWebView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        NaverMapSdk.getInstance(this).setClient(
-                new NaverMapSdk.NaverCloudPlatformClient("9f1fnoqugk"));
+        initializeViews();
+        loadData();
+        configureWebView();
+        setupSearchArea();
+        MakeChart.setChart(chart);
 
-        locationSource =
-                new FusedLocationSource(this, LOCATION_PERMISSION_REQUEST_CODE);
+        ReadGeojson readGeojson = new ReadGeojson();
+        readGeojson.parseGeoJson(readGeojson.readGeoJsonFile(this)); // Geojson 파일 읽어서 행정동 parse하기
 
-        MapFragment mapFragment = (MapFragment)getSupportFragmentManager().findFragmentById(R.id.map_fragment);
-        mapFragment.getMapAsync(this); //이걸떄려줘야하는거같음
+        searchButton2.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                new Thread(new Runnable() { // 이렇게 안하면 메인스레드 멈춤
+                    public void run() {
+                        // 백그라운드 스레드에서 실행할 작업
+                        GetTemp.TempThread tempThread = new GetTemp.TempThread(); // thread 안쓰면 오류 떴던거로 기억
+                        tempThread.start(); // 기온 가져오기
+                        try {
+                            tempThread.join();
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
 
-        WebView myWebView = (WebView) findViewById(R.id.webview);
+                        // 작업이 끝나면 UI 스레드에 결과를 전달
+                        runOnUiThread(new Runnable() {
+                            public void run() {
+                                // UI 스레드에서 처리할 작업
+                                MakeChart.setChart(chart);
+                                //HeatIslandAlg.Do(); // 동과 구의 기온차이 계산 (GetTemp에서 반복 횟수 줄였을 때 에러뜨니까, 줄일려면 주석처리)
+                                loadData();
+                            }
+                        });
+                    }
+                }).start();
+            }
+        });
+    }
+
+    private void initializeViews() {
+        myWebView = findViewById(R.id.webview);
+        chart = (LineChart) findViewById(R.id.LineChart); // LineChart는 외부(MPAndroidChart)에서 가져옴
+        searchEditText = findViewById(R.id.searchEditText);
+        searchButton = findViewById(R.id.searchButton);
+        searchButton2 = findViewById(R.id.searchButton2);
+    }
+
+    private void configureWebView() {
         WebSettings mWebSettings = myWebView.getSettings();
         mWebSettings.setJavaScriptEnabled(true);
         mWebSettings.setLoadWithOverviewMode(true);
@@ -67,85 +92,68 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         mWebSettings.setLayoutAlgorithm(WebSettings.LayoutAlgorithm.SINGLE_COLUMN);
         mWebSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         mWebSettings.setDomStorageEnabled(true);
+
         myWebView.loadUrl("file:///android_asset/www/heatmap.html");
 
-        searchEditText = findViewById(R.id.searchEditText);
-        searchButton = findViewById(R.id.searchButton);
-
-        searchButton.setOnClickListener(new View.OnClickListener() { // button 클릭 시 입력한 장소에 해당 하는 좌표 표시
+        myWebView.setWebViewClient(new WebViewClient() {
             @Override
-            public void onClick(View v) {
-                String query = searchEditText.getText().toString();
-                try {
-                    String encodedAddress = URLEncoder.encode(query, "UTF-8");
-                    String urlStr = "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode" + "?query=" + encodedAddress;
-
-                    AddrToCoord.ConnectThread thread = new AddrToCoord.ConnectThread(urlStr); //주소를 좌표로 변환
-                    thread.start();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+            public void onPageFinished(WebView view, String url) {
+                // JavaScript 함수 호출, index.js에 있는 loadMapData 호출
+                myWebView.loadUrl("javascript:loadMapData('" + jsonDataOfArea + "', '" + HEAT_ISLAND_TEMP + "')");
             }
         });
-
-        chart = (LineChart) findViewById(R.id.LineChart);
-
-        GetTemp.TempThread tempThread = new GetTemp.TempThread();
-        tempThread.start();
-        try {
-            tempThread.join();
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
-        MakeChart.setChart(chart);
     }
 
-    //Map
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           @NonNull String[] permissions, @NonNull int[] grantResults) {
-        if (locationSource.onRequestPermissionsResult(
-                requestCode, permissions, grantResults)) {
-            if (!locationSource.isActivated()) { // 권한 거부됨
-                naverMap.setLocationTrackingMode(LocationTrackingMode.None);
+    private void loadData() {
+        //HashMap을 자바스크립트로 넘기려면 json형태로 변환한 후 넘겨야함
+        Gson gson = new Gson();
+
+        //jsonDataOfArea = gson.toJson(tempDiff); // tempDiff : 동 이름 + 동과 구와의 기온 차 저장 돼있는 Map ( 동 기준으로 하려면 이거로 데이터 작업해서 json에 넘겨야 함 )
+        NameDictionary.Gu_Dictionary();
+        Map<String, Double> changedKeys = new HashMap<>(); // sortedTemp에 구 이름이 영어여서, 한글로 바꿔 저장할 Map
+
+        for (String key : sortedTemp.keySet()) { // sortedTemp : 구 이름 + 구 기온 저장 돼있는 Map
+            String newKey = GU_DICT.get(key); // 번역한 key를 get
+            Double value = sortedTemp.get(key); // key에 해당하는 기존 value값 get
+
+            changedKeys.put(newKey, value); // 새로운 키에 기존 값 할당
+        }
+        jsonDataOfArea = gson.toJson(changedKeys); // gson에 데이터 보내기
+
+        myWebView.loadUrl("javascript:loadMapData('" + jsonDataOfArea + "', '" + HEAT_ISLAND_TEMP + "')"); // 지도 갱신
+    }
+
+    // searchEditText에 지역명(areaName)을 쓰고 searchButton을 클릭하면 해당 지역의 위도, 경도를 불러옴.
+    // 입력예시) 종로구3가(x), 종로 3가(o)
+    private void setupSearchArea(){
+        searchButton.setOnClickListener(v -> {
+            areaName = searchEditText.getText().toString();
+            try {
+                String encodedAddress = URLEncoder.encode(areaName, "UTF-8");
+                String urlStr = "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode" + "?query=" + encodedAddress;
+
+                //지역의 좌표정보를 얻어오려면 스레드를 사용해야함
+                AddrToCoord.ConnectThread thread = new AddrToCoord.ConnectThread(urlStr, new AddrToCoord.CoordListener() {
+                    @Override
+                    public void onCoordReceived(double lat, double lng) {
+                        //latitude와 longitude변수에 좌표를 저장합니다.
+                        latitude = lat;
+                        longitude = lng;
+
+                        //이렇게 하면 ConnectThread에서 좌표를 받아오는 작업이 완료된 후, 메인 스레드에서 웹뷰(해당 지역으로 카메라를 이동시킴)를 업데이트
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                myWebView.loadUrl("javascript:moveCameraToArea('" + latitude + "', '" + longitude + "', '" + areaName + "')");
+                            }
+                        });
+                    }
+                });
+                thread.start();
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            return;
-        }
-        super.onRequestPermissionsResult(
-                requestCode, permissions, grantResults);
-    }
-
-    @Override
-    public void onMapReady(@NonNull NaverMap naverMap) {
-        CameraPosition cameraPosition = new CameraPosition(
-                new LatLng(37.5666102,126.9783881), // 대상 지점
-                9 // 줌 레벨
-        );
-        naverMap.setCameraPosition(cameraPosition);
-
-        int temperature = 11, color;
-        PolygonOverlay polygon = new PolygonOverlay();
-        polygon.setCoords(COORDS_1);
-
-        if(temperature > 10) // '10도 이상 차이가 난다면' 같은 기준 정해서 조건문에 넣으면 될 듯
-            color = ResourcesCompat.getColor(getResources(), R.color.red, getTheme());
-        else color = ResourcesCompat.getColor(getResources(), R.color.blue, getTheme());
-
-        polygon.setColor(ColorUtils.setAlphaComponent(color, 50));
-        polygon.setOutlineColor(color);
-
-        polygon.setMap(naverMap);
-
-        //서울시청에 마커를 설치하기
-        marker.setPosition(new LatLng(37.5666102, 126.9783881));
-        marker.setMap(naverMap);
-
-        this.naverMap = naverMap;
-        naverMap.setLocationSource(locationSource);
-        naverMap.setLocationTrackingMode(LocationTrackingMode.Follow);
-
-        UiSettings uiSettings = naverMap.getUiSettings();
-        uiSettings.setLocationButtonEnabled(true);
+        });
     }
 }
