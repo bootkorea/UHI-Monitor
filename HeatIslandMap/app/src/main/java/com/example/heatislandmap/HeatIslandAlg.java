@@ -19,9 +19,9 @@ public class HeatIslandAlg {
         for(int i = 0; i < REGION_NAME.size(); i++) { // 모든 구의 12 ~ 16시 기온의 평균 계산
             Double sum = 0.0;
 
-            for (int j = 0; j < 5; j++) {
-                sum += avg_temp_arr[i][j]; // avg_temp_arr의 각 행에는 각 구의 12 ~ 16시 기온의 평균이 저장돼 있으므로
-            }
+//            for (int j = 0; j < 5; j++) {
+//                sum += avg_temp_arr[i][j]; // avg_temp_arr의 각 행에는 각 구의 12 ~ 16시 기온의 평균이 저장돼 있으므로
+//            }
 
             NameDictionary.Gu_Dictionary();
             String region = GU_DICT.get(REGION_NAME.get(i)); // REGION_NAME은 영어이므로 한글로

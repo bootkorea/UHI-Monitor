@@ -11,9 +11,13 @@ import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 
+import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.LineChart;
 import com.google.gson.Gson;
 
@@ -22,16 +26,21 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
-    private static final double HEAT_ISLAND_TEMP = -0.5; //임의로 설정한 열섬기준온도, -0.5도를 열섬기준 온도로 잡았음, -0.5도가 넘어가는 지역은 열섬지역으로 간주
+    public static double HEAT_ISLAND_TEMP1 = 0.0; //임의로 설정한 열섬기준온도, -0.5도를 열섬기준 온도로 잡았음, -0.5도가 넘어가는 지역은 열섬지역으로 간주
+    public static double HEAT_ISLAND_TEMP2 = 0.0;
+    public static double HEAT_ISLAND_AVG = 0.0;
 
     private String jsonDataOfArea; //지역&온도를 담은 HashMap을 json형태로 바꾼 것
     private String areaName; //검색창에 입력할 지역명
-    private LineChart chart;
+    private BarChart chart;
     private double latitude, longitude; //검색한 지역의 위도, 경도
 
     private EditText searchEditText;
     private Button searchButton, searchButton2;
     private WebView myWebView;
+
+    private Spinner UHI_spinner;
+    private static double[] UHI_threshold = {0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,7 +51,7 @@ public class MainActivity extends AppCompatActivity {
         loadData();
         configureWebView();
         setupSearchArea();
-        MakeChart.setChart(chart);
+        // MakeChart.setChart(chart);
 
         ReadGeojson readGeojson = new ReadGeojson();
         readGeojson.parseGeoJson(readGeojson.readGeoJsonFile(this)); // Geojson 파일 읽어서 행정동 parse하기
@@ -65,23 +74,41 @@ public class MainActivity extends AppCompatActivity {
                         runOnUiThread(new Runnable() {
                             public void run() {
                                 // UI 스레드에서 처리할 작업
-                                MakeChart.setChart(chart);
-                                //HeatIslandAlg.Do(); // 동과 구의 기온차이 계산 (GetTemp에서 반복 횟수 줄였을 때 에러뜨니까, 줄일려면 주석처리)
                                 loadData();
+                                MakeChart.setChart(chart);
+                                chart.invalidate();
+                                //HeatIslandAlg.Do(); // 동과 구의 기온차이 계산 (GetTemp에서 반복 횟수 줄였을 때 에러뜨니까, 줄일려면 주석처리)
                             }
                         });
                     }
                 }).start();
             }
         });
+
+        UHI_spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                HEAT_ISLAND_TEMP1 = Float.parseFloat(parent.getItemAtPosition(position).toString());
+                HEAT_ISLAND_TEMP2 = HEAT_ISLAND_TEMP1 / 2.0;
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                HEAT_ISLAND_TEMP1 = 0.0;
+                HEAT_ISLAND_TEMP2 = HEAT_ISLAND_TEMP1 / 2.0;
+            }
+        });
     }
 
     private void initializeViews() {
         myWebView = findViewById(R.id.webview);
-        chart = (LineChart) findViewById(R.id.LineChart); // LineChart는 외부(MPAndroidChart)에서 가져옴
+        chart = (BarChart) findViewById(R.id.BarChart); // LineChart는 외부(MPAndroidChart)에서 가져옴
         searchEditText = findViewById(R.id.searchEditText);
         searchButton = findViewById(R.id.searchButton);
         searchButton2 = findViewById(R.id.searchButton2);
+        UHI_spinner = findViewById(R.id.UHI_spinner);
+        ArrayAdapter UHIAdapter = ArrayAdapter.createFromResource(this, R.array.UHI_threshold, android.R.layout.simple_spinner_dropdown_item);
+        UHIAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        UHI_spinner.setAdapter(UHIAdapter);
     }
 
     private void configureWebView() {
@@ -99,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 // JavaScript 함수 호출, index.js에 있는 loadMapData 호출
-                myWebView.loadUrl("javascript:loadMapData('" + jsonDataOfArea + "', '" + HEAT_ISLAND_TEMP + "')");
+                myWebView.loadUrl("javascript:loadMapData('" + jsonDataOfArea + "', '" + HEAT_ISLAND_TEMP1 + "', '" + HEAT_ISLAND_TEMP2 + "', '" + HEAT_ISLAND_AVG + "')");
             }
         });
     }
@@ -120,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
         }
         jsonDataOfArea = gson.toJson(changedKeys); // gson에 데이터 보내기
 
-        myWebView.loadUrl("javascript:loadMapData('" + jsonDataOfArea + "', '" + HEAT_ISLAND_TEMP + "')"); // 지도 갱신
+        myWebView.loadUrl("javascript:loadMapData('" + jsonDataOfArea + "', '" + HEAT_ISLAND_TEMP1 + "', '" + HEAT_ISLAND_TEMP2 + "', '" + HEAT_ISLAND_AVG + "')");
     }
 
     // searchEditText에 지역명(areaName)을 쓰고 searchButton을 클릭하면 해당 지역의 위도, 경도를 불러옴.

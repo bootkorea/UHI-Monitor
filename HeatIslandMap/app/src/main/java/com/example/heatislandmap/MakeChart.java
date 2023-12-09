@@ -3,54 +3,82 @@ package com.example.heatislandmap;
 import android.graphics.Color;
 
 import androidx.annotation.NonNull;
+import static com.example.heatislandmap.GetTemp.sortedTemp;
+import static com.example.heatislandmap.MainActivity.HEAT_ISLAND_AVG;
+import static com.example.heatislandmap.NameDictionary.GU_DICT;
 
+import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
+import com.github.mikephil.charting.data.BarData;
+import com.github.mikephil.charting.data.BarDataSet;
+import com.github.mikephil.charting.data.BarEntry;
+import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
+import com.github.mikephil.charting.formatter.IValueFormatter;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.utils.ColorTemplate;
+import com.github.mikephil.charting.utils.ViewPortHandler;
 
+import java.text.DecimalFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class MakeChart {
     private static Random random = new Random();
     //Chart 생성 및 초기화
-    protected static void setChart(@NonNull LineChart ch){
-        List<String> TimeValues = Arrays.asList("12:00", "13:00", "14:00", "15:00", "16:00"); //원하는 시간대.. (차트의 x축 담당 List)
-        ch.getDescription().setEnabled(false);
+    protected static void setChart(@NonNull BarChart chart){
+        chart.setDrawGridBackground(false);
+        chart.setDrawBarShadow(false);
+        chart.setDrawBorders(false);
 
-        XAxis xAxis = ch.getXAxis();
-        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setGranularity(1f);
-        xAxis.setDrawAxisLine(false);
-        xAxis.setDrawGridLines(false);
-        xAxis.setValueFormatter(new IndexAxisValueFormatter(TimeValues));
-        xAxis.setLabelCount(5); // x축 개수(시간대)를 늘리면 그 개수 만큼 여기도 늘리기
-        xAxis.setSpaceMin(0.1f);
-        xAxis.setSpaceMax(0.1f);
+        BarData barData;
+        BarDataSet barDataSet;
+        ArrayList barEntriesArrayList = new ArrayList<>();
+        ArrayList xAxis = new ArrayList<>();
 
-        ch.getAxisRight().setEnabled(false);
+        List<Map.Entry<String, Double>> entryList = new ArrayList<>(sortedTemp.entrySet());
+        //평균 기온을 기준으로 내림차순으로 정렬
+        entryList.sort(Map.Entry.<String, Double>comparingByValue().reversed());
 
-        Legend legend = ch.getLegend();
-        legend.setVerticalAlignment(Legend.LegendVerticalAlignment.BOTTOM);
-        legend.setForm(Legend.LegendForm.CIRCLE);
+        for(int i = 0; i < 5; ++i) {
+            barEntriesArrayList.add(new BarEntry(i, entryList.get(i).getValue().floatValue()));
+            xAxis.add(new String(GU_DICT.get(entryList.get(i).getKey())));
+        }
+        barEntriesArrayList.add(new BarEntry(5, (float)HEAT_ISLAND_AVG));
+        xAxis.add(new String("서울시 평균"));
 
-        ch.invalidate();
-        AddEntries.addValue(ch);
-    }
+        XAxis xaxis = chart.getXAxis();
+        xaxis.setValueFormatter(new IndexAxisValueFormatter(xAxis));
+        xaxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xaxis.setTextSize(12f);
+        xaxis.setDrawGridLines(false);
 
-    protected static void setDataSet(LineData data, LineDataSet lineDataSet){
-        data.addDataSet(lineDataSet);
+        YAxis axisLeft = chart.getAxisLeft();
+        axisLeft.setDrawGridLines(false);
+//        axisLeft.setDrawAxisLine(false);
 
-        lineDataSet.setLineWidth(3);
-        lineDataSet.setDrawValues(false);
-        lineDataSet.setDrawCircles(true);
+        YAxis axisRight = chart.getAxisRight();
+        axisRight.setDrawGridLines(false);
+        axisRight.setDrawAxisLine(false);
+        axisRight.setDrawLabels(false);
 
-        int randomColor = Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256));
-        lineDataSet.setColor(randomColor);
-        lineDataSet.setCircleColor(randomColor);
+        barDataSet = new BarDataSet(barEntriesArrayList, "핫플레이스 TOP5");
+
+        barDataSet.setColors(Color.argb(255, 255, 0, 0), Color.argb(215, 255, 0, 0),Color.argb(175, 255, 0, 0),Color.argb(135, 255, 0, 0),Color.argb(85, 255, 0, 0),Color.argb(255, 0, 0, 255));
+        barDataSet.setValueTextColor(Color.BLACK);
+        barDataSet.setValueTextSize(12f);
+        chart.getDescription().setEnabled(false);
+
+        barData = new BarData(barDataSet);
+
+        chart.setData(barData);
     }
 }

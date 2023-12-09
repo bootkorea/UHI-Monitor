@@ -22,7 +22,7 @@ public class ReadGeojson {
     protected String readGeoJsonFile(@NonNull Context context) { //GeoJsonFile 읽기
         String json = null;
         try {
-            InputStream is = context.getAssets().open("hangjeongdong.geojson");
+            InputStream is = context.getAssets().open("sggnm.geojson");
 
             int size = is.available(); // 파일 사이즈
             byte[] buffer = new byte[size]; // 파일 사이즈만큼 버퍼 생성
@@ -46,11 +46,11 @@ public class ReadGeojson {
                 JSONObject feature = features.getJSONObject(i);
                 JSONObject properties = feature.getJSONObject("properties");
 
-                String admName = properties.getString("adm_nm"); // 시, 구, 행정동 추출
+                String admName = properties.getString("SIG_ENG_NM"); // 시, 구, 행정동 추출
 
-                String[] admNameSplit = admName.split(" "); // 공백을 기준으로 분할
-                String guName = admNameSplit[admNameSplit.length - 2]; // 두번째 요소인 구 추출
-                String dongName = admNameSplit[admNameSplit.length - 1]; // 마지막 요소인 행정동 추출
+//                String[] admNameSplit = admName.split(" "); // 공백을 기준으로 분할
+                String guName = admName; // 두번째 요소인 구 추출
+                String dongName = admName; // 마지막 요소인 행정동 추출
 
                 Map<String, String> dong_gu = new HashMap<>();
                 dong_gu.put(dongName, guName);
