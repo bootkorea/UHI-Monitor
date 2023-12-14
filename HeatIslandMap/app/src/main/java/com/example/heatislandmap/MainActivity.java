@@ -1,13 +1,19 @@
 package com.example.heatislandmap;
 
+import static com.example.heatislandmap.GetTemp.avg_humid_arr;
+import static com.example.heatislandmap.GetTemp.feel_like_temp;
+import static com.example.heatislandmap.GetTemp.sortedFeellike;
+import static com.example.heatislandmap.GetTemp.sortedHumid;
 import static com.example.heatislandmap.GetTemp.sortedTemp;
 import static com.example.heatislandmap.HeatIslandAlg.tempDiff;
 import static com.example.heatislandmap.NameDictionary.GU_DICT;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.ProgressDialog;
 import android.os.Bundle;
 import android.view.View;
+import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -15,33 +21,43 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
+import android.widget.TextView;
 
 import com.github.mikephil.charting.charts.BarChart;
+import com.github.mikephil.charting.charts.Chart;
 import com.github.mikephil.charting.charts.LineChart;
 import com.google.gson.Gson;
 
+import org.w3c.dom.Text;
+
 import java.net.URLEncoder;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity{
     public static double HEAT_ISLAND_TEMP1 = 0.0; //임의로 설정한 열섬기준온도, -0.5도를 열섬기준 온도로 잡았음, -0.5도가 넘어가는 지역은 열섬지역으로 간주
     public static double HEAT_ISLAND_TEMP2 = 0.0;
     public static double HEAT_ISLAND_AVG = 0.0;
 
     private String jsonDataOfArea; //지역&온도를 담은 HashMap을 json형태로 바꾼 것
+    private String jsonDataofHumid;
+    private String jsonDataofFeel;
     private String areaName; //검색창에 입력할 지역명
-    private BarChart chart;
+    private LineChart chart;
     private double latitude, longitude; //검색한 지역의 위도, 경도
 
     private EditText searchEditText;
-    private Button searchButton, searchButton2;
+    private Button searchButton, searchButton2, howtoButton;
     private WebView myWebView;
+    private TextView logView;
 
     private Spinner UHI_spinner;
     private static double[] UHI_threshold = {0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2, 2.4, 2.6, 2.8, 3.0};
-
+    ProgressDialog dialog;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -59,6 +75,19 @@ public class MainActivity extends AppCompatActivity {
         searchButton2.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                dialog = new ProgressDialog(MainActivity.this);
+                dialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+                dialog.setCancelable(false);
+
+                String day = LocalDate.now().minusDays(2).toString();
+                int time = LocalTime.now().getHour();
+                day = day.replace("-", "/");
+                String date = day + " " + String.valueOf(time) + "시 열섬지도";
+
+                logView.setText(date);
+
+                dialog.setMessage("Checking Data");
+                dialog.show();
                 new Thread(new Runnable() { // 이렇게 안하면 메인스레드 멈춤
                     public void run() {
                         // 백그라운드 스레드에서 실행할 작업
@@ -73,10 +102,10 @@ public class MainActivity extends AppCompatActivity {
                         // 작업이 끝나면 UI 스레드에 결과를 전달
                         runOnUiThread(new Runnable() {
                             public void run() {
+                                dialog.cancel();
                                 // UI 스레드에서 처리할 작업
                                 loadData();
                                 MakeChart.setChart(chart);
-                                chart.invalidate();
                                 //HeatIslandAlg.Do(); // 동과 구의 기온차이 계산 (GetTemp에서 반복 횟수 줄였을 때 에러뜨니까, 줄일려면 주석처리)
                             }
                         });
@@ -84,6 +113,22 @@ public class MainActivity extends AppCompatActivity {
                 }).start();
             }
         });
+
+        howtoButton.setOnClickListener(new View.OnClickListener(){
+            @Override
+            public void onClick(View v) {
+                CustomDialog customDialog = new CustomDialog(MainActivity.this);
+                customDialog.show();
+            }
+        });
+
+
+        //다이얼로그 밖의 화면은 흐리게 만들어줌
+        WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
+        layoutParams.flags = WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+        layoutParams.dimAmount = 0.8f;
+        getWindow().setAttributes(layoutParams);
+
 
         UHI_spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
@@ -97,15 +142,19 @@ public class MainActivity extends AppCompatActivity {
                 HEAT_ISLAND_TEMP2 = HEAT_ISLAND_TEMP1 / 2.0;
             }
         });
+
+        searchButton2.performClick();
     }
 
     private void initializeViews() {
         myWebView = findViewById(R.id.webview);
-        chart = (BarChart) findViewById(R.id.BarChart); // LineChart는 외부(MPAndroidChart)에서 가져옴
+        chart = (LineChart) findViewById(R.id.BarChart); // LineChart는 외부(MPAndroidChart)에서 가져옴
         searchEditText = findViewById(R.id.searchEditText);
         searchButton = findViewById(R.id.searchButton);
         searchButton2 = findViewById(R.id.searchButton2);
+        howtoButton = findViewById(R.id.howtoButton);
         UHI_spinner = findViewById(R.id.UHI_spinner);
+        logView = (TextView) findViewById(R.id.logView);
         ArrayAdapter UHIAdapter = ArrayAdapter.createFromResource(this, R.array.UHI_threshold, android.R.layout.simple_spinner_dropdown_item);
         UHIAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         UHI_spinner.setAdapter(UHIAdapter);
@@ -138,16 +187,23 @@ public class MainActivity extends AppCompatActivity {
         //jsonDataOfArea = gson.toJson(tempDiff); // tempDiff : 동 이름 + 동과 구와의 기온 차 저장 돼있는 Map ( 동 기준으로 하려면 이거로 데이터 작업해서 json에 넘겨야 함 )
         NameDictionary.Gu_Dictionary();
         Map<String, Double> changedKeys = new HashMap<>(); // sortedTemp에 구 이름이 영어여서, 한글로 바꿔 저장할 Map
+        Map<String, Double> humidKeys = new HashMap<>();
+        Map<String, Double> feellikeKeys = new HashMap<>();
 
         for (String key : sortedTemp.keySet()) { // sortedTemp : 구 이름 + 구 기온 저장 돼있는 Map
             String newKey = GU_DICT.get(key); // 번역한 key를 get
             Double value = sortedTemp.get(key); // key에 해당하는 기존 value값 get
 
             changedKeys.put(newKey, value); // 새로운 키에 기존 값 할당
+            humidKeys.put(newKey, sortedHumid.get(key));
+            feellikeKeys.put(newKey, sortedFeellike.get(key));
         }
         jsonDataOfArea = gson.toJson(changedKeys); // gson에 데이터 보내기
+        jsonDataofHumid = gson.toJson(humidKeys);
+        jsonDataofFeel = gson.toJson(feellikeKeys);
 
-        myWebView.loadUrl("javascript:loadMapData('" + jsonDataOfArea + "', '" + HEAT_ISLAND_TEMP1 + "', '" + HEAT_ISLAND_TEMP2 + "', '" + HEAT_ISLAND_AVG + "')");
+        myWebView.loadUrl("javascript:loadMapData('" + jsonDataOfArea + "', '" + HEAT_ISLAND_TEMP1 + "', '" + HEAT_ISLAND_TEMP2 + "', '" + HEAT_ISLAND_AVG +
+                "', '" + jsonDataofHumid + "', '" + jsonDataofFeel + "')");
     }
 
     // searchEditText에 지역명(areaName)을 쓰고 searchButton을 클릭하면 해당 지역의 위도, 경도를 불러옴.

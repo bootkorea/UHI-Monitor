@@ -3,6 +3,9 @@ package com.example.heatislandmap;
 import android.graphics.Color;
 
 import androidx.annotation.NonNull;
+
+import static com.example.heatislandmap.GetTemp.sortedFeellike;
+import static com.example.heatislandmap.GetTemp.sortedHumid;
 import static com.example.heatislandmap.GetTemp.sortedTemp;
 import static com.example.heatislandmap.MainActivity.HEAT_ISLAND_AVG;
 import static com.example.heatislandmap.NameDictionary.GU_DICT;
@@ -18,15 +21,9 @@ import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.IValueFormatter;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
-import com.github.mikephil.charting.formatter.ValueFormatter;
-import com.github.mikephil.charting.utils.ColorTemplate;
-import com.github.mikephil.charting.utils.ViewPortHandler;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -34,51 +31,77 @@ import java.util.Random;
 public class MakeChart {
     private static Random random = new Random();
     //Chart 생성 및 초기화
-    protected static void setChart(@NonNull BarChart chart){
+    protected static void setChart(@NonNull LineChart chart){
         chart.setDrawGridBackground(false);
-        chart.setDrawBarShadow(false);
         chart.setDrawBorders(false);
+        chart.setDragEnabled(false);
+        chart.setScaleEnabled(false);
 
-        BarData barData;
-        BarDataSet barDataSet;
-        ArrayList barEntriesArrayList = new ArrayList<>();
-        ArrayList xAxis = new ArrayList<>();
+        LineData lineData = new LineData();
 
-        List<Map.Entry<String, Double>> entryList = new ArrayList<>(sortedTemp.entrySet());
+        List<ArrayList<Entry>> entryList = new ArrayList<>();
+        ArrayList<String> xAxis = new ArrayList<>();
+
+        List<Map.Entry<String, Double>> entry = new ArrayList<>(sortedTemp.entrySet());
         //평균 기온을 기준으로 내림차순으로 정렬
-        entryList.sort(Map.Entry.<String, Double>comparingByValue().reversed());
+        entry.sort(Map.Entry.<String, Double>comparingByValue().reversed());
+
+        ArrayList<Entry> entry1 = new ArrayList<>();
+        //ArrayList<Entry> entry2 = new ArrayList<>();
+        ArrayList<Entry> entry3 = new ArrayList<>();
 
         for(int i = 0; i < 5; ++i) {
-            barEntriesArrayList.add(new BarEntry(i, entryList.get(i).getValue().floatValue()));
-            xAxis.add(new String(GU_DICT.get(entryList.get(i).getKey())));
+            entry1.add(new Entry(i, entry.get(i).getValue().floatValue()));
+            //entry2.add(new Entry(i, sortedHumid.get(entry.get(i).getKey()).floatValue()));
+            entry3.add(new Entry(i, sortedFeellike.get(entry.get(i).getKey()).floatValue()));
+            xAxis.add(new String(GU_DICT.get(entry.get(i).getKey())));
         }
-        barEntriesArrayList.add(new BarEntry(5, (float)HEAT_ISLAND_AVG));
-        xAxis.add(new String("서울시 평균"));
+//        entry1.add(new Entry(5, (float)HEAT_ISLAND_AVG));
+//        xAxis.add(new String("서울시 평균"));
+
+        entryList.add(entry1);
+        //entryList.add(entry2);
+        entryList.add(entry3);
 
         XAxis xaxis = chart.getXAxis();
-        xaxis.setValueFormatter(new IndexAxisValueFormatter(xAxis));
         xaxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xaxis.setGranularity(1f);
+        xaxis.setValueFormatter(new IndexAxisValueFormatter(xAxis));
         xaxis.setTextSize(12f);
         xaxis.setDrawGridLines(false);
 
+
         YAxis axisLeft = chart.getAxisLeft();
         axisLeft.setDrawGridLines(false);
-//        axisLeft.setDrawAxisLine(false);
 
         YAxis axisRight = chart.getAxisRight();
         axisRight.setDrawGridLines(false);
         axisRight.setDrawAxisLine(false);
         axisRight.setDrawLabels(false);
 
-        barDataSet = new BarDataSet(barEntriesArrayList, "핫플레이스 TOP5");
+        LineDataSet lineDataSet = new LineDataSet(entryList.get(0),"기온");
+        lineDataSet.setLineWidth(3);
+        lineDataSet.setDrawValues(true);
+        lineDataSet.setDrawCircles(true);
+        int randomColor = Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256));
+        lineDataSet.setColor(randomColor);
+        lineDataSet.setCircleColor(randomColor);
 
-        barDataSet.setColors(Color.argb(255, 255, 0, 0), Color.argb(215, 255, 0, 0),Color.argb(175, 255, 0, 0),Color.argb(135, 255, 0, 0),Color.argb(85, 255, 0, 0),Color.argb(255, 0, 0, 255));
-        barDataSet.setValueTextColor(Color.BLACK);
-        barDataSet.setValueTextSize(12f);
+        lineData.addDataSet(lineDataSet);
+
+        LineDataSet lineDataSet2 = new LineDataSet(entryList.get(1),"체감온도");
+        lineDataSet.setLineWidth(3);
+        lineDataSet.setDrawValues(true);
+        lineDataSet.setDrawCircles(true);
+        randomColor = Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256));
+        lineDataSet.setColor(randomColor);
+        lineDataSet.setCircleColor(randomColor);
+
+        lineData.addDataSet(lineDataSet2);
+
         chart.getDescription().setEnabled(false);
 
-        barData = new BarData(barDataSet);
-
-        chart.setData(barData);
+        chart.setData(lineData);
+        chart.invalidate();
     }
 }

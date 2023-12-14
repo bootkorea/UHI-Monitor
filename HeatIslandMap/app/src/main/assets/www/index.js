@@ -53,7 +53,7 @@ for(var i = 0; i < 25; ++i) {
         anchorSize: new naver.maps.Size(0, 0),
         anchorSkew: true,
         anchorColor: "#ffffff",
-        pixelOffset: new naver.maps.Point(20, 20)
+        pixelOffset: new naver.maps.Point(40, 40)
     });
 }
 
@@ -68,6 +68,9 @@ var map;
 var selectedAreaName = null;
 
 var current_temperature_dict = {};
+var current_humid_dict = {};
+var current_feellike_dict = {};
+
 
 // 페이지 로드 시 지도 초기화, 페이지가 로드될 때 맵이 한 번만 생성되고, 이후에는 동일한 맵 인스턴스가 재사용
 window.onload = function() {
@@ -82,6 +85,7 @@ function initializeMap() {
             mapTypeId: 'normal',
             center: DEFAULT_MAP_CENTER,
             zoomControl: true,
+            borderWidth: 0,
 
             //지도 줌 컨드롤러바를 지도 오른쪽에 설정해둠
             zoomControlOptions: {
@@ -96,7 +100,7 @@ function initializeMap() {
                 map: map,
                 position: coordinates[i],
                 icon: {
-                    content: '<img src="./img.png" style="solid transparent; display: block; position: absolute; width: 25px; height: 25px;">',
+                    content: '<img src="./img3.png" style="solid transparent; display: block; position: absolute; width: 5vh; height: 5vh;">',
                 }
             });
 //            marker[i] = new naver.maps.Marker({
@@ -120,24 +124,28 @@ function initializeMap() {
 }
 
 // loadMapData 지도정보를 불러오고 레이어를 띄움
-function loadMapData(jsonString, HEAT_ISLAND_TEMP1, HEAT_ISLAND_TEMP2, HEAT_ISLAND_AVG) {
+function loadMapData(jsonString, HEAT_ISLAND_TEMP1, HEAT_ISLAND_TEMP2, HEAT_ISLAND_AVG, HUMIDITY, FEEL_LIKE_TEMP) {
     HEAT_THRESHOLD1 = HEAT_ISLAND_TEMP1;
     HEAT_THRESHOLD2 = HEAT_ISLAND_TEMP2;
     HEAT_AVG = HEAT_ISLAND_AVG;
 
     var data = JSON.parse(jsonString);
+    var humid = JSON.parse(HUMIDITY);
+    var feellike = JSON.parse(FEEL_LIKE_TEMP);
     if (!map) {
         map = initializeMap(); // 지도가 아직 초기화되지 않았다면 초기화
     }
-    get_current_temperature_dict(data);
+    get_current_temperature_dict(data, humid, feellike);
     loadDataLayer(map, data); //레이어를 띄움
     //displayData(data); //html에 지역&해당지역온도가 잘 넘어가는지 확인하기 위함
     update_infowindow(map);
 }
 
-function get_current_temperature_dict(data) {
+function get_current_temperature_dict(data, humid, feellike) {
     for(key in data) if(!current_temperature_dict[key]) {
         current_temperature_dict[key] = data[key];
+        current_humid_dict[key] = humid[key];
+        current_feellike_dict[key] = feellike[key];
         name_num_map[name_num_map_cnt] = key;
         name_num_map_cnt += 1;
     }
@@ -145,7 +153,7 @@ function get_current_temperature_dict(data) {
 
 function update_infowindow(map) {
     for(var i = 0; i < 25; ++i) {
-        contentString[i] = `${name_num_map[i]}: ${current_temperature_dict[name_num_map[i]]}`;
+        contentString[i] = `[${name_num_map[i]}] <br> 기온: ${current_temperature_dict[name_num_map[i]]} ℃ <br> 습도: ${current_humid_dict[name_num_map[i]]}% <br> 체감온도: ${current_feellike_dict[name_num_map[i]]} ℃`;
 
         naver.maps.Event.clearListeners(marker[i], "click");
 
@@ -158,7 +166,7 @@ function update_infowindow(map) {
             anchorSize: new naver.maps.Size(0, 0),
             anchorSkew: true,
             anchorColor: "#ffffff",
-            pixelOffset: new naver.maps.Point(20, 20)
+            pixelOffset: new naver.maps.Point(40, -20)
         });
 
         naver.maps.Event.addListener(marker[i], "click", (function (marker, infowindow) {
