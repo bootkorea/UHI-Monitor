@@ -56,8 +56,8 @@ public class MakeChart {
             entry3.add(new Entry(i, sortedFeellike.get(entry.get(i).getKey()).floatValue()));
             xAxis.add(new String(GU_DICT.get(entry.get(i).getKey())));
         }
-//        entry1.add(new Entry(5, (float)HEAT_ISLAND_AVG));
-//        xAxis.add(new String("서울시 평균"));
+        entry1.add(new Entry(5, (float)HEAT_ISLAND_AVG));
+        xAxis.add(new String("평균"));
 
         entryList.add(entry1);
         //entryList.add(entry2);
@@ -67,12 +67,13 @@ public class MakeChart {
         xaxis.setPosition(XAxis.XAxisPosition.BOTTOM);
         xaxis.setGranularity(1f);
         xaxis.setValueFormatter(new IndexAxisValueFormatter(xAxis));
-        xaxis.setTextSize(12f);
+        xaxis.setTextSize(10f);
         xaxis.setDrawGridLines(false);
 
 
         YAxis axisLeft = chart.getAxisLeft();
         axisLeft.setDrawGridLines(false);
+        axisLeft.setTextSize(8f);
 
         YAxis axisRight = chart.getAxisRight();
         axisRight.setDrawGridLines(false);
@@ -86,16 +87,18 @@ public class MakeChart {
         int randomColor = Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256));
         lineDataSet.setColor(randomColor);
         lineDataSet.setCircleColor(randomColor);
+        lineDataSet.setValueTextSize(10f);
 
         lineData.addDataSet(lineDataSet);
 
         LineDataSet lineDataSet2 = new LineDataSet(entryList.get(1),"체감온도");
-        lineDataSet.setLineWidth(3);
-        lineDataSet.setDrawValues(true);
-        lineDataSet.setDrawCircles(true);
+        lineDataSet2.setLineWidth(3);
+        lineDataSet2.setDrawValues(true);
+        lineDataSet2.setDrawCircles(true);
         randomColor = Color.rgb(random.nextInt(256), random.nextInt(256), random.nextInt(256));
-        lineDataSet.setColor(randomColor);
-        lineDataSet.setCircleColor(randomColor);
+        lineDataSet2.setColor(randomColor);
+        lineDataSet2.setCircleColor(randomColor);
+        lineDataSet2.setValueTextSize(10f);
 
         lineData.addDataSet(lineDataSet2);
 
